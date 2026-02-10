@@ -1,12 +1,13 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { CheckCircle2, AlertCircle, Lightbulb, PenLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScoreGauge } from "@/components/results/score-gauge"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 type AnalyzeResponse = {
   overallScore: number
@@ -15,8 +16,6 @@ type AnalyzeResponse = {
   suggestions: string[]
   keywordGaps: string[]
 }
-
-const ANALYSIS_STORAGE_PREFIX = "resume-analysis:"
 
 const fallbackResult: AnalyzeResponse = {
   overallScore: 74,
@@ -42,32 +41,59 @@ const fallbackResult: AnalyzeResponse = {
   keywordGaps: ["System Design", "Kubernetes", "Stakeholder Management"],
 }
 
-function getStoredAnalysis(id: string | null) {
-  if (!id) {
-    return null
-  }
-
-  try {
-    const raw = sessionStorage.getItem(`${ANALYSIS_STORAGE_PREFIX}${id}`)
-
-    if (!raw) {
-      return null
-    }
-
-    return JSON.parse(raw) as AnalyzeResponse
-  } catch {
-    return null
-  }
-}
-
 export function ResultsContent() {
   const searchParams = useSearchParams()
+  const [result, setResult] = useState<AnalyzeResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const result = useMemo(() => {
-    const id = searchParams.get("id")
+  const resumeId = useMemo(() => searchParams.get("id"), [searchParams])
 
-    return getStoredAnalysis(id) ?? fallbackResult
-  }, [searchParams])
+  useEffect(() => {
+    const fetchResume = async () => {
+      if (!resumeId) {
+        setResult(fallbackResult)
+        setIsLoading(false)
+        return
+      }
+
+      const supabase = getSupabaseBrowserClient()
+      const { data, error } = await supabase
+        .from("resumes")
+        .select("analysis")
+        .eq("id", resumeId)
+        .single()
+
+      if (error || !data?.analysis) {
+        setErrorMessage(error?.message || "Unable to load your resume analysis.")
+        setIsLoading(false)
+        return
+      }
+
+      setResult(data.analysis as AnalyzeResponse)
+      setIsLoading(false)
+    }
+
+    void fetchResume()
+  }, [resumeId])
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-4xl text-center">
+        <p className="text-muted-foreground">Loading your results...</p>
+      </div>
+    )
+  }
+
+  if (!result) {
+    return (
+      <div className="mx-auto w-full max-w-4xl text-center">
+        <p className="text-muted-foreground">
+          {errorMessage ?? "No results found."}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto w-full max-w-4xl">

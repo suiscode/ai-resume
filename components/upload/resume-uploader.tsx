@@ -6,10 +6,12 @@ import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Upload, FileText, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 type AnalyzeResponse = {
   overallScore: number
@@ -19,16 +21,7 @@ type AnalyzeResponse = {
   keywordGaps: string[]
 }
 
-const ANALYSIS_STORAGE_PREFIX = "resume-analysis:"
 const MAX_ANALYZE_RETRIES = 2
-
-function createAnalysisId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID()
-  }
-
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
 
 function getUserError(response: Response, fallback: string) {
   return response
@@ -146,17 +139,34 @@ export function ResumeUploader() {
         throw new Error("We could not analyze your resume. Please try again.")
       }
 
-      const analysisId = createAnalysisId()
-      sessionStorage.setItem(
-        `${ANALYSIS_STORAGE_PREFIX}${analysisId}`,
-        JSON.stringify({
-          ...analyzePayload,
-          createdAt: Date.now(),
-          source: file ? "pdf" : "text",
-        }),
-      )
+      const supabase = getSupabaseBrowserClient()
+      const { data: sessionData } = await supabase.auth.getSession()
 
-      router.push(`/results?id=${encodeURIComponent(analysisId)}`)
+      if (!sessionData.session?.user) {
+        throw new Error("Please sign in to save your resume.")
+      }
+
+      const inferredTitle = file?.name?.replace(/\.pdf$/i, "")?.trim()
+      const title = inferredTitle || `Resume - ${format(new Date(), "MMM d, yyyy")}`
+
+      const { data: storedResume, error: insertError } = await supabase
+        .from("resumes")
+        .insert({
+          user_id: sessionData.session.user.id,
+          title,
+          source: file ? "pdf" : "text",
+          score: analyzePayload.overallScore,
+          analysis: analyzePayload,
+          resume_text: normalizedResumeText,
+        })
+        .select("id")
+        .single()
+
+      if (insertError || !storedResume) {
+        throw new Error(insertError?.message || "Unable to save your resume.")
+      }
+
+      router.push(`/results?id=${encodeURIComponent(storedResume.id)}`)
     } catch (error) {
       const message = error instanceof Error
         ? error.message

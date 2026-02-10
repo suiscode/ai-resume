@@ -11,17 +11,6 @@ export function Footer() {
           </div>
           <span className="font-heading text-lg font-bold text-foreground">ResumeAI</span>
         </div>
-        <nav className="flex items-center gap-6">
-          <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Home
-          </Link>
-          <Link href="/upload" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Upload
-          </Link>
-          <Link href="/dashboard" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Dashboard
-          </Link>
-        </nav>
         <p className="text-sm text-muted-foreground">
           {"2026 ResumeAI. All rights reserved."}
         </p>
