@@ -5,10 +5,65 @@ import React from "react"
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Upload, FileText, X, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+
+type AnalyzeResponse = {
+  overallScore: number
+  strengths: string[]
+  weaknesses: string[]
+  suggestions: string[]
+  keywordGaps: string[]
+}
+
+const ANALYSIS_STORAGE_PREFIX = "resume-analysis:"
+const MAX_ANALYZE_RETRIES = 2
+
+function createAnalysisId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID()
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function getUserError(response: Response, fallback: string) {
+  return response
+    .json()
+    .then((body: { error?: string } | null) => body?.error ?? fallback)
+    .catch(() => fallback)
+}
+
+async function extractTextFromPdf(file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const extractionResponse = await fetch("/api/extract", {
+    method: "POST",
+    body: formData,
+  })
+
+  if (!extractionResponse.ok) {
+    const message = await getUserError(
+      extractionResponse,
+      "Failed to process your PDF resume.",
+    )
+    throw new Error(message)
+  }
+
+  const extractionPayload = (await extractionResponse.json()) as {
+    normalizedResumeText?: string
+  }
+
+  if (!extractionPayload.normalizedResumeText) {
+    throw new Error("Could not extract text from the uploaded PDF.")
+  }
+
+  return extractionPayload.normalizedResumeText
+}
 
 export function ResumeUploader() {
   const router = useRouter()
@@ -16,6 +71,7 @@ export function ResumeUploader() {
   const [text, setText] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [attemptCount, setAttemptCount] = useState(0)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -43,12 +99,76 @@ export function ResumeUploader() {
     }
   }, [])
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     setIsLoading(true)
-    setTimeout(() => {
-      router.push("/results")
-    }, 2000)
-  }, [router])
+    setAttemptCount(0)
+
+    try {
+      const normalizedResumeText = file
+        ? await extractTextFromPdf(file)
+        : text.trim()
+
+      if (!normalizedResumeText) {
+        throw new Error("Please add resume content before submitting.")
+      }
+
+      let analyzeResponse: Response | null = null
+      let analyzePayload: AnalyzeResponse | null = null
+
+      for (let attempt = 0; attempt <= MAX_ANALYZE_RETRIES; attempt += 1) {
+        setAttemptCount(attempt + 1)
+        analyzeResponse = await fetch("/api/analyze", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ normalizedResumeText }),
+        })
+
+        if (analyzeResponse.ok) {
+          analyzePayload = (await analyzeResponse.json()) as AnalyzeResponse
+          break
+        }
+
+        if (analyzeResponse.status >= 500 && attempt < MAX_ANALYZE_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)))
+          continue
+        }
+
+        const errorMessage = await getUserError(
+          analyzeResponse,
+          "Failed to analyze your resume.",
+        )
+        throw new Error(errorMessage)
+      }
+
+      if (!analyzeResponse?.ok || !analyzePayload) {
+        throw new Error("We could not analyze your resume. Please try again.")
+      }
+
+      const analysisId = createAnalysisId()
+      sessionStorage.setItem(
+        `${ANALYSIS_STORAGE_PREFIX}${analysisId}`,
+        JSON.stringify({
+          ...analyzePayload,
+          createdAt: Date.now(),
+          source: file ? "pdf" : "text",
+        }),
+      )
+
+      router.push(`/results?id=${encodeURIComponent(analysisId)}`)
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Something went wrong while analyzing your resume."
+
+      toast.error("Analysis failed", {
+        description: message,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [file, router, text])
 
   return (
     <Card className="w-full max-w-2xl border border-border/60 shadow-lg">
@@ -145,7 +265,9 @@ export function ResumeUploader() {
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Analyzing Resume...
+                {attemptCount > 1
+                  ? `Retrying analysis (${attemptCount - 1}/${MAX_ANALYZE_RETRIES})...`
+                  : "Analyzing Resume..."}
               </>
             ) : (
               <>
