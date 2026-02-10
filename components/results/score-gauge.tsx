@@ -64,7 +64,7 @@ export function ScoreGauge({ score, label = "ATS Score" }: ScoreGaugeProps) {
           <span className="text-xs text-muted-foreground">{getLabel(animatedScore)}</span>
         </div>
       </div>
-      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="text-sm font-heading text-muted-foreground">{label}</span>
     </div>
   )
 }

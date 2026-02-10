@@ -48,7 +48,7 @@ export default function SettingsPage() {
           <CardContent className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-foreground">Email Notifications</p>
+                <p className="text-sm font-heading text-foreground">Email Notifications</p>
                 <p className="text-sm text-muted-foreground">Receive review results via email</p>
               </div>
               <Switch defaultChecked />
@@ -56,7 +56,7 @@ export default function SettingsPage() {
             <Separator />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-foreground">Weekly Reports</p>
+                <p className="text-sm font-heading text-foreground">Weekly Reports</p>
                 <p className="text-sm text-muted-foreground">Get a weekly summary of your progress</p>
               </div>
               <Switch defaultChecked />
@@ -64,7 +64,7 @@ export default function SettingsPage() {
             <Separator />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-foreground">AI Tips</p>
+                <p className="text-sm font-heading text-foreground">AI Tips</p>
                 <p className="text-sm text-muted-foreground">Receive personalized resume improvement tips</p>
               </div>
               <Switch />

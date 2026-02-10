@@ -204,7 +204,7 @@ export function ResumeUploader() {
                     <FileText className="h-7 w-7 text-primary" />
                   </div>
                   <div className="text-center">
-                    <p className="font-medium text-foreground">{file.name}</p>
+                    <p className="font-heading text-foreground">{file.name}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {(file.size / 1024).toFixed(1)} KB
                     </p>
@@ -228,7 +228,7 @@ export function ResumeUploader() {
                     <Upload className="h-7 w-7 text-muted-foreground" />
                   </div>
                   <div className="text-center">
-                    <p className="font-medium text-foreground">
+                    <p className="font-heading text-foreground">
                       Drop your PDF here or click to browse
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">

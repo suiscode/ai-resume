@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState, type FormEvent } from "react"
 import { Loader2, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
@@ -20,6 +21,7 @@ export function AuthCard({ mode }: AuthCardProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const isRegister = mode === "register"
 
@@ -37,11 +39,19 @@ export function AuthCard({ mode }: AuthCardProps) {
             ? "Account created. Check your email to verify your account."
             : "Account created successfully.",
         )
+        router.push("/sign-in")
         return
       }
 
       await signInWithEmail(email, password)
+      try {
+        localStorage.setItem("resumeai-auth", "true")
+        localStorage.setItem("resumeai-email", email)
+      } catch {
+        // Ignore storage errors in restricted environments.
+      }
       toast.success("Signed in successfully.")
+      router.push("/")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Authentication failed.")
     } finally {
@@ -108,7 +118,7 @@ export function AuthCard({ mode }: AuthCardProps) {
           {isRegister ? "Already registered?" : "Don’t have an account?"}{" "}
           <Link
             href={isRegister ? "/sign-in" : "/register"}
-            className="font-medium text-foreground underline-offset-4 hover:underline"
+            className="font-heading text-foreground underline-offset-4 hover:underline"
           >
             {isRegister ? "Sign in" : "Create one"}
           </Link>

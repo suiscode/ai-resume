@@ -32,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased">
+      <body className={`${_spaceGrotesk.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
