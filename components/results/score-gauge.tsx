@@ -9,11 +9,12 @@ interface ScoreGaugeProps {
 
 export function ScoreGauge({ score, label = "ATS Score" }: ScoreGaugeProps) {
   const [animatedScore, setAnimatedScore] = useState(0)
+  const normalizedScore = Math.max(0, Math.min(100, Math.round(score)))
 
   useEffect(() => {
-    const timer = setTimeout(() => setAnimatedScore(score), 200)
+    const timer = setTimeout(() => setAnimatedScore(normalizedScore), 200)
     return () => clearTimeout(timer)
-  }, [score])
+  }, [normalizedScore])
 
   const circumference = 2 * Math.PI * 54
   const offset = circumference - (animatedScore / 100) * circumference

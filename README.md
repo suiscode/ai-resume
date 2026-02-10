@@ -6,16 +6,21 @@ Create a `.env.local` file for local development:
 
 ```bash
 GEMINI_API_KEY=your_gemini_api_key
-# Optional: defaults to gemini-2.0-flash
-GEMINI_MODEL=gemini-2.0-flash
+# Optional: defaults to gemini-2.5-flash
+GEMINI_MODEL=gemini-2.5-flash
+
+# Supabase Auth (for /sign-in and /register)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 - `GEMINI_API_KEY` is required by `POST /api/analyze`.
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are required for client-side email/password auth on `/sign-in` and `/register` via Supabase Auth.
 - If `GEMINI_API_KEY` is missing, the route returns HTTP `500` with a safe configuration error message.
 
 ## API: `POST /api/analyze`
 
-Analyzes normalized resume text and returns structured scoring feedback.
+Analyzes normalized resume text and returns structured scoring feedback. The `overallScore` is always an integer from 0 to 100.
 
 ### Request JSON
 
