@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 interface AuthGuardProps {
   children: ReactNode
@@ -12,20 +13,34 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
-    let authed = false
-    try {
-      authed = localStorage.getItem("resumeai-auth") === "true"
-    } catch {
-      authed = false
+    const supabase = getSupabaseBrowserClient()
+
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession()
+      if (error || !data.session) {
+        router.replace("/sign-in")
+        setIsAuthed(false)
+        return
+      }
+
+      setIsAuthed(true)
     }
 
-    if (!authed) {
-      router.replace("/sign-in")
-      setIsAuthed(false)
-      return
-    }
+    void checkSession()
 
-    setIsAuthed(true)
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.replace("/sign-in")
+        setIsAuthed(false)
+        return
+      }
+
+      setIsAuthed(true)
+    })
+
+    return () => {
+      subscription.subscription.unsubscribe()
+    }
   }, [router])
 
   if (!isAuthed) {

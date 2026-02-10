@@ -5,40 +5,35 @@ import { FileText, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useEffect, useState } from "react"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isAuthed, setIsAuthed] = useState(false)
 
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem("resumeai-auth")
-      localStorage.removeItem("resumeai-email")
-    } catch {
-      // Ignore storage errors in restricted environments.
-    }
+  const handleLogout = async () => {
+    const supabase = getSupabaseBrowserClient()
+    await supabase.auth.signOut()
     setIsAuthed(false)
   }
 
   useEffect(() => {
-    const readAuth = () => {
-      try {
-        return localStorage.getItem("resumeai-auth") === "true"
-      } catch {
-        return false
-      }
+    const supabase = getSupabaseBrowserClient()
+
+    const init = async () => {
+      const { data } = await supabase.auth.getSession()
+      setIsAuthed(!!data.session)
     }
 
-    setIsAuthed(readAuth())
+    void init()
 
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === "resumeai-auth") {
-        setIsAuthed(event.newValue === "true")
-      }
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthed(!!session)
+    })
+
+    return () => {
+      subscription.subscription.unsubscribe()
     }
-
-    window.addEventListener("storage", handleStorage)
-    return () => window.removeEventListener("storage", handleStorage)
   }, [])
 
   return (
@@ -53,7 +48,7 @@ export function Navbar() {
           </span>
         </Link>
 
-        <div className="hidden items-center gap-8 md:flex">
+        <div className="hidden -mr-28 items-center gap-8 md:flex">
           <Link
             href="/"
             className="text-sm font-heading text-muted-foreground transition-colors hover:text-foreground"
