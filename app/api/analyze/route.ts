@@ -23,12 +23,12 @@ const analyzeResponseSchema = z.object({
 
 type AnalyzeResponse = z.infer<typeof analyzeResponseSchema>
 
-const openAiModel = process.env.OPENAI_MODEL ?? "gpt-4o-mini"
-const openAiUrl = "https://api.openai.com/v1/chat/completions"
-const openAiTimeoutMs = 20_000
+const geminiModel = process.env.GEMINI_MODEL ?? "gemini-2.0-flash"
+const geminiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models"
+const geminiTimeoutMs = 20_000
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
 
   if (!apiKey) {
     return NextResponse.json(
@@ -61,94 +61,89 @@ export async function POST(request: NextRequest) {
   }
 
   const { normalizedResumeText, jobTarget } = parsedInput.data
+  const geminiUrl = `${geminiBaseUrl}/${geminiModel}:generateContent?key=${encodeURIComponent(apiKey)}`
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), openAiTimeoutMs)
+  const timeout = setTimeout(() => controller.abort(), geminiTimeoutMs)
 
   try {
-    const completionResponse = await fetch(openAiUrl, {
+    const completionResponse = await fetch(geminiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: openAiModel,
-        temperature: 0.2,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "resume_analysis",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                overallScore: { type: "number", minimum: 0, maximum: 100 },
-                strengths: {
-                  type: "array",
-                  minItems: 1,
-                  maxItems: 10,
-                  items: { type: "string" },
-                },
-                weaknesses: {
-                  type: "array",
-                  minItems: 1,
-                  maxItems: 10,
-                  items: { type: "string" },
-                },
-                suggestions: {
-                  type: "array",
-                  minItems: 1,
-                  maxItems: 10,
-                  items: { type: "string" },
-                },
-                keywordGaps: {
-                  type: "array",
-                  maxItems: 20,
-                  items: { type: "string" },
-                },
-              },
-              required: [
-                "overallScore",
-                "strengths",
-                "weaknesses",
-                "suggestions",
-                "keywordGaps",
-              ],
+        systemInstruction: {
+          parts: [
+            {
+              text: "You are a strict ATS-style resume analyzer. Evaluate resumes with evidence-based scoring only. Do not invent facts. Output JSON only and follow the provided schema exactly.",
             },
-          },
+          ],
         },
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a strict ATS-style resume analyzer. Evaluate resumes with evidence-based scoring only. Do not invent facts. Output JSON only and follow the provided schema exactly.",
-          },
+        contents: [
           {
             role: "user",
-            content: [
-              "Analyze the resume and return objective, concise feedback.",
-              `Job target: ${jobTarget ?? "Not provided"}`,
-              "Resume text:",
-              normalizedResumeText,
-            ].join("\n\n"),
+            parts: [
+              {
+                text: [
+                  "Analyze the resume and return objective, concise feedback.",
+                  `Job target: ${jobTarget ?? "Not provided"}`,
+                  "Resume text:",
+                  normalizedResumeText,
+                ].join("\n\n"),
+              },
+            ],
           },
         ],
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              overallScore: { type: "NUMBER" },
+              strengths: {
+                type: "ARRAY",
+                items: { type: "STRING" },
+              },
+              weaknesses: {
+                type: "ARRAY",
+                items: { type: "STRING" },
+              },
+              suggestions: {
+                type: "ARRAY",
+                items: { type: "STRING" },
+              },
+              keywordGaps: {
+                type: "ARRAY",
+                items: { type: "STRING" },
+              },
+            },
+            required: [
+              "overallScore",
+              "strengths",
+              "weaknesses",
+              "suggestions",
+              "keywordGaps",
+            ],
+          },
+        },
       }),
       signal: controller.signal,
     })
 
     const responseBody = (await completionResponse.json().catch(() => null)) as
       | {
-          choices?: Array<{
-            message?: {
-              content?: string
+          candidates?: Array<{
+            content?: {
+              parts?: Array<{
+                text?: string
+              }>
             }
           }>
           error?: {
             message?: string
-            type?: string
+            status?: string
           }
         }
       | null
@@ -177,7 +172,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const content = responseBody?.choices?.[0]?.message?.content
+    const content = responseBody?.candidates?.[0]?.content?.parts?.[0]?.text
 
     if (!content) {
       return NextResponse.json(
