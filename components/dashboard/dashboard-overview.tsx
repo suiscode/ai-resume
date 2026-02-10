@@ -105,7 +105,7 @@ export function DashboardOverview() {
         {analyticsCards.map((card) => (
           <Card key={card.title} className="border border-border/60 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-sm font-heading text-muted-foreground">
                 {card.title}
               </CardTitle>
               <card.icon className="h-4 w-4 text-muted-foreground" />
@@ -138,7 +138,7 @@ export function DashboardOverview() {
               {recentResumes.map((resume) => (
                 <TableRow key={resume.id}>
                   <TableCell>
-                    <Link href="/results" className="font-medium text-foreground hover:text-primary">
+                    <Link href="/results" className="font-heading text-foreground hover:text-primary">
                       {resume.name}
                     </Link>
                   </TableCell>

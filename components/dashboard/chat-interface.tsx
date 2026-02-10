@@ -201,7 +201,7 @@ export function ChatInterface() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div>
-              <p className="text-sm font-medium text-foreground">Software Engineer Resume</p>
+              <p className="text-sm font-heading text-foreground">Software Engineer Resume</p>
               <p className="text-xs text-muted-foreground">Last updated: Feb 8, 2026</p>
             </div>
 
@@ -213,7 +213,7 @@ export function ChatInterface() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs font-heading text-muted-foreground uppercase tracking-wider">
                 Key Skills
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -228,7 +228,7 @@ export function ChatInterface() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs font-heading text-muted-foreground uppercase tracking-wider">
                 Areas to Improve
               </p>
               <ul className="flex flex-col gap-1.5 text-xs text-muted-foreground">
