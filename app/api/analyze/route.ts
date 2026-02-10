@@ -14,7 +14,13 @@ const analyzeRequestSchema = z.object({
 })
 
 const analyzeResponseSchema = z.object({
-  overallScore: z.number().min(0).max(100),
+  overallScore: z.preprocess((value) => {
+    if (typeof value === "number") {
+      return Math.round(value)
+    }
+
+    return value
+  }, z.number().int().min(0).max(100)),
   strengths: z.array(z.string().min(1).max(500)).min(1).max(10),
   weaknesses: z.array(z.string().min(1).max(500)).min(1).max(10),
   suggestions: z.array(z.string().min(1).max(500)).min(1).max(10),
@@ -76,7 +82,7 @@ export async function POST(request: NextRequest) {
         systemInstruction: {
           parts: [
             {
-              text: "You are a strict ATS-style resume analyzer. Evaluate resumes with evidence-based scoring only. Do not invent facts. Output JSON only and follow the provided schema exactly.",
+              text: "You are a strict ATS-style resume analyzer. Evaluate resumes with evidence-based scoring only. Do not invent facts. overallScore must be an integer from 0 to 100 with no decimals. Output JSON only and follow the provided schema exactly.",
             },
           ],
         },
@@ -101,7 +107,7 @@ export async function POST(request: NextRequest) {
           responseSchema: {
             type: "OBJECT",
             properties: {
-              overallScore: { type: "NUMBER" },
+              overallScore: { type: "INTEGER" },
               strengths: {
                 type: "ARRAY",
                 items: { type: "STRING" },
@@ -147,9 +153,6 @@ export async function POST(request: NextRequest) {
           }
         }
       | null
-
-console.log(completionResponse.status);
-
 
     if (!completionResponse.ok) {
       if (completionResponse.status === 429) {

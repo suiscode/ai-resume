@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.08),transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--foreground)/0.08),transparent_60%)]" />
       <div className="relative mx-auto flex max-w-7xl flex-col items-center px-6 pb-20 pt-24 text-center lg:pb-32 lg:pt-36">
         <Badge
           variant="secondary"
@@ -18,9 +18,7 @@ export function HeroSection() {
 
         <h1 className="max-w-4xl text-balance font-heading text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
           AI Resume Reviewer{" "}
-          <span className="text-primary">
-            Get Instant Feedback
-          </span>{" "}
+          <span className="text-foreground">Get Instant Feedback</span>{" "}
           on Your Resume
         </h1>
 
