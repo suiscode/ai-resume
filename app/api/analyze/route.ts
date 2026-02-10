@@ -23,7 +23,7 @@ const analyzeResponseSchema = z.object({
 
 type AnalyzeResponse = z.infer<typeof analyzeResponseSchema>
 
-const geminiModel = process.env.GEMINI_MODEL ?? "gemini-2.0-flash"
+const geminiModel = process.env.GEMINI_MODEL ?? "gemini-2.5-flash"
 const geminiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models"
 const geminiTimeoutMs = 20_000
 
@@ -147,6 +147,9 @@ export async function POST(request: NextRequest) {
           }
         }
       | null
+
+console.log(completionResponse.status);
+
 
     if (!completionResponse.ok) {
       if (completionResponse.status === 429) {
