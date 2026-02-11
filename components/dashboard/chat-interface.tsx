@@ -1,7 +1,5 @@
 "use client"
 
-import React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { Send, Bot, User, FileText, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { cn } from "@/lib/utils"
 
 interface Message {
@@ -17,14 +16,27 @@ interface Message {
   content: string
 }
 
-const initialMessages: Message[] = [
-  {
-    id: 1,
-    role: "assistant",
-    content:
-      "Hi! I'm your AI Resume Coach. I've reviewed your latest resume (Software Engineer Resume - Score: 82). How can I help you improve it today?",
-  },
-]
+interface StoredAnalysis {
+  suggestions?: string[]
+  weaknesses?: string[]
+}
+
+interface ResumeContext {
+  title: string
+  score: number
+  createdAt: string
+  suggestions: string[]
+  weaknesses: string[]
+  resumeText: string
+}
+
+function buildWelcomeMessage(resumeContext: ResumeContext | null) {
+  if (!resumeContext) {
+    return "Hi! I'm your AI Resume Coach. Upload or review a resume to get tailored advice."
+  }
+
+  return `Hi! I'm your AI Resume Coach. I've reviewed your latest resume (${resumeContext.title} - Score: ${resumeContext.score}). How can I help you improve it today?`
+}
 
 const quickPrompts = [
   "How can I improve my bullet points?",
@@ -34,9 +46,17 @@ const quickPrompts = [
 ]
 
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 1,
+      role: "assistant",
+      content: buildWelcomeMessage(null),
+    },
+  ])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [isLoadingContext, setIsLoadingContext] = useState(true)
+  const [resumeContext, setResumeContext] = useState<ResumeContext | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -46,36 +66,113 @@ export function ChatInterface() {
     }
   }, [messages, isTyping])
 
-  const handleSend = () => {
-    if (!input.trim()) return
+  useEffect(() => {
+    const loadLatestResumeContext = async () => {
+      const supabase = getSupabaseBrowserClient()
+      const { data, error } = await supabase
+        .from("resumes")
+        .select("title,score,created_at,analysis,resume_text")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!error && data) {
+        const analysis = (data.analysis as StoredAnalysis | null) ?? null
+        const nextContext: ResumeContext = {
+          title: data.title ?? "Latest Resume",
+          score: typeof data.score === "number" ? data.score : 0,
+          createdAt: data.created_at ?? "",
+          suggestions: Array.isArray(analysis?.suggestions) ? analysis.suggestions.slice(0, 3) : [],
+          weaknesses: Array.isArray(analysis?.weaknesses) ? analysis.weaknesses.slice(0, 3) : [],
+          resumeText:
+            typeof data.resume_text === "string" ? data.resume_text.slice(0, 4000) : "",
+        }
+
+        setResumeContext(nextContext)
+        setMessages([
+          {
+            id: 1,
+            role: "assistant",
+            content: buildWelcomeMessage(nextContext),
+          },
+        ])
+      }
+
+      setIsLoadingContext(false)
+    }
+
+    void loadLatestResumeContext()
+  }, [])
+
+  const handleSend = async (prefill?: string) => {
+    if (isTyping) return
+
+    const value = (prefill ?? input).trim()
+    if (!value) return
 
     const userMessage: Message = {
       id: messages.length + 1,
       role: "user",
-      content: input.trim(),
+      content: value,
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    const conversation = [...messages, userMessage]
+    setMessages(conversation)
     setInput("")
     setIsTyping(true)
 
-    setTimeout(() => {
-      const responses = [
-        "Great question! Looking at your resume, I'd suggest quantifying your achievements more. For example, instead of 'Improved application performance,' try 'Improved application load time by 40%, reducing bounce rate by 15%.' Numbers make your impact concrete and memorable for recruiters.",
-        "Based on your current resume, I recommend adding more industry-specific keywords like 'CI/CD,' 'microservices,' and 'agile methodology.' These terms are commonly scanned by ATS systems and will help your resume pass automated screening.",
-        "Your summary is solid but could be more impactful. Try leading with your years of experience and most impressive metric. For example: '7+ year software engineer with a track record of delivering scalable systems serving 1M+ users.'",
-        "To strengthen your bullet points, use the STAR method: Situation, Task, Action, Result. Each bullet should start with a strong action verb and end with a measurable outcome. I can help you rewrite specific bullets if you share them.",
-      ]
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: conversation.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          resumeContext: resumeContext
+            ? {
+                title: resumeContext.title,
+                score: resumeContext.score,
+                suggestions: resumeContext.suggestions,
+                weaknesses: resumeContext.weaknesses,
+                resumeText: resumeContext.resumeText,
+              }
+            : undefined,
+        }),
+      })
+
+      const payload = (await response.json().catch(() => null)) as
+        | { reply?: string; error?: string }
+        | null
+
+      if (!response.ok || !payload?.reply) {
+        throw new Error(payload?.error || "Unable to get a response right now.")
+      }
 
       const aiMessage: Message = {
-        id: messages.length + 2,
+        id: conversation.length + 1,
         role: "assistant",
-        content: responses[Math.floor(Math.random() * responses.length)],
+        content: payload.reply,
       }
 
       setMessages((prev) => [...prev, aiMessage])
+    } catch (error) {
+      const aiMessage: Message = {
+        id: conversation.length + 1,
+        role: "assistant",
+        content:
+          error instanceof Error
+            ? `I ran into an issue: ${error.message}`
+            : "I ran into an issue while generating a response.",
+      }
+
+      setMessages((prev) => [...prev, aiMessage])
+    } finally {
       setIsTyping(false)
-    }, 1500)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -157,8 +254,7 @@ export function ChatInterface() {
                 <button
                   key={prompt}
                   onClick={() => {
-                    setInput(prompt)
-                    textareaRef.current?.focus()
+                    void handleSend(prompt)
                   }}
                   className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
                 >
@@ -177,7 +273,7 @@ export function ChatInterface() {
                 rows={1}
               />
               <Button
-                onClick={handleSend}
+                onClick={() => void handleSend()}
                 disabled={!input.trim() || isTyping}
                 size="icon"
                 className="h-11 w-11 flex-shrink-0"
@@ -200,52 +296,45 @@ export function ChatInterface() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div>
-              <p className="text-sm font-heading text-foreground">Software Engineer Resume</p>
-              <p className="text-xs text-muted-foreground">Last updated: Feb 8, 2026</p>
-            </div>
+            {isLoadingContext ? (
+              <p className="text-sm text-muted-foreground">Loading latest resume context...</p>
+            ) : resumeContext ? (
+              <>
+                <div>
+                  <p className="text-sm font-heading text-foreground">{resumeContext.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Last updated: {new Date(resumeContext.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <Badge className="bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]">
-                Score: 82
-              </Badge>
-              <Badge variant="secondary" className="bg-accent text-accent-foreground">v3</Badge>
-            </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]">
+                    Score: {resumeContext.score}
+                  </Badge>
+                </div>
 
-            <div className="flex flex-col gap-2">
-              <p className="text-xs font-heading text-muted-foreground uppercase tracking-wider">
-                Key Skills
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-heading text-muted-foreground uppercase tracking-wider">
+                    Areas to Improve
+                  </p>
+                  <ul className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+                    {(resumeContext.suggestions.length > 0
+                      ? resumeContext.suggestions
+                      : resumeContext.weaknesses
+                    ).map((item) => (
+                      <li key={item} className="flex items-start gap-1.5">
+                        <Sparkles className="mt-0.5 h-3 w-3 flex-shrink-0 text-primary" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No resume found yet. Upload one to get personalized coaching context.
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {["React", "TypeScript", "Node.js", "Python", "AWS", "PostgreSQL"].map(
-                  (skill) => (
-                    <Badge key={skill} variant="outline" className="text-xs">
-                      {skill}
-                    </Badge>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <p className="text-xs font-heading text-muted-foreground uppercase tracking-wider">
-                Areas to Improve
-              </p>
-              <ul className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-                <li className="flex items-start gap-1.5">
-                  <Sparkles className="mt-0.5 h-3 w-3 flex-shrink-0 text-primary" />
-                  Add metrics to achievements
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Sparkles className="mt-0.5 h-3 w-3 flex-shrink-0 text-primary" />
-                  Include portfolio link
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Sparkles className="mt-0.5 h-3 w-3 flex-shrink-0 text-primary" />
-                  Strengthen action verbs
-                </li>
-              </ul>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
