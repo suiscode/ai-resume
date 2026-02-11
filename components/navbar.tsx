@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { FileText, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useEffect, useState } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [isAuthed, setIsAuthed] = useState(false)
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
 
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient()
@@ -71,7 +72,7 @@ export function Navbar() {
 
         <div className="hidden items-center gap-3 md:flex">
           <ThemeToggle />
-          {isAuthed ? (
+          {isAuthed === true ? (
             <>
               <Button asChild size="sm">
                 <Link href="/dashboard">Profile</Link>
@@ -80,7 +81,7 @@ export function Navbar() {
                 Log out
               </Button>
             </>
-          ) : (
+          ) : isAuthed === false ? (
             <>
               <Button asChild variant="outline" size="sm">
                 <Link href="/sign-in">Sign In</Link>
@@ -88,6 +89,11 @@ export function Navbar() {
               <Button asChild size="sm">
                 <Link href="/register">Get Started</Link>
               </Button>
+            </>
+          ) : (
+            <>
+              <Skeleton className="h-9 w-20 rounded-md" />
+              <Skeleton className="h-9 w-24 rounded-md" />
             </>
           )}
         </div>
@@ -130,7 +136,7 @@ export function Navbar() {
               Dashboard
             </Link>
             <div className="flex flex-col gap-2 pt-2">
-              {isAuthed ? (
+              {isAuthed === true ? (
                 <>
                   <Button asChild size="sm">
                     <Link href="/dashboard">Profile</Link>
@@ -139,7 +145,7 @@ export function Navbar() {
                     Log out
                   </Button>
                 </>
-              ) : (
+              ) : isAuthed === false ? (
                 <>
                   <Button asChild variant="outline" size="sm">
                     <Link href="/sign-in">Sign In</Link>
@@ -147,6 +153,11 @@ export function Navbar() {
                   <Button asChild size="sm">
                     <Link href="/register">Get Started</Link>
                   </Button>
+                </>
+              ) : (
+                <>
+                  <Skeleton className="h-9 w-full rounded-md" />
+                  <Skeleton className="h-9 w-full rounded-md" />
                 </>
               )}
             </div>
