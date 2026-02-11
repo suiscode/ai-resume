@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  LayoutDashboard,
   FileText,
   MessageSquare,
   Settings,
@@ -16,7 +15,6 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { useState } from "react"
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/resumes", label: "My Resumes", icon: FileText },
   { href: "/dashboard/chat", label: "AI Coach Chat", icon: MessageSquare },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
